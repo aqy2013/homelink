@@ -2,17 +2,103 @@
 import scrapy
 import re
 import string
+from itertools import product
 from ..items import HomelinkItem
 from scrapy.shell import inspect_response
-
+import pymysql
+import pymysql.cursors
 
 class HomeSpider(scrapy.Spider):
+
+
     name = "home"
     base_url = 'http://sh.lianjia.com'
     allowed_domains = ["sh.lianjia.com"]
     start_urls = [base_url + '/zufang']
 
+    # 可筛选条件
+    districts = {
+        'pudongxinqu': '浦东',
+        'minhang': '闵行',
+        'baoshan': '宝山',
+        'xuhui': '徐汇',
+        'putuo': '普陀',
+        'yangpu': '杨浦',
+        'changning': '长宁',
+        'songjiang': '松江',
+        'jiading': '嘉定',
+        'huangpu': '黄浦',
+        'jingan': '静安',
+        'zhabei': '闸北',
+        'hongkou': '虹口',
+        'qingpu': '青浦',
+        'fengxian': '奉贤',
+        'jinshan': '金山',
+        'chongming': '崇明'
+    }
+    prices = {
+        'z1': '1000-2000元',
+        'z2': '2000-4000元',
+        'z3': '4000-6000元',
+        'z4': '6000-8000元',
+        'z5': '8000-12000元',
+        'z6': '12000元',
+    }
+    areas = {
+        'a1': '50平以下',
+        'a2': '50-70平',
+        'a3': '70-90平',
+        'a4': '90-110平',
+        'a5': '110-130平',
+        'a6': '130-150平',
+        'a7': '150平以上',
+    }
+    rooms = {'l1': '一室', 'l2': '二室', 'l3': '三室',
+             'l4': '四室', 'l5': '五室', 'l6': '五室以上', }
+    faces = {'f1': '东', 'f2': '南', 'f3': '西', 'f4': '北', 'f10': '南北', }
+    house_ages = {'y1': '2年内', 'y2': '2-5年',
+                  'y3': '5-10年', 'y4': '10-20年', 'y5': '20年以上', }
+    floors = {'c1': '低区', 'c2': '中区', 'c3': '高区', }
+    decorations = {'x1': '精装', 'x2': '豪装',
+                   'x3': '中装', 'x4': '简装', 'x5': '毛坯', }
+    brand = {'n1': '链家', 'n2': '自如',}
+    kind = {'i1': '整租', 'i2': '合租' ,}
+    lable = {'t1': '地铁房', 't3': '随时看', 't4': '降价',}
+    # type_keys = product(prices.keys(), areas.keys(), rooms.keys(), faces.keys(), house_ages.keys(),
+    #                     floors.keys(), decorations.keys(), brand.keys(), kind.keys() ,lable.keys())
+    type_keys = product(prices.keys(), areas.keys())
+     # 排列组合所有条件
+    list_urls = {}
+    for district in districts:
+        for type_key in type_keys:
+            url = base_url + '/zufang/' + district + '/' + ''.join(type_key)
+            list_urls[url] = 0
+            start_urls.append(url)
+
+    def __init__(self):
+        self.conn = pymysql.connect(
+            host='127.0.0.1',
+            user='root',
+            passwd='123456',
+            charset='utf8',
+            use_unicode=False
+        )
+        cursor = self.conn.cursor()
+        cursor.execute('select distinct(xqid) from lianjia.data')
+        result = cursor.fetchall()
+        self.xqids = []
+        for item in result:
+            self.xqids.append(item[0])
+
     def parse(self, response):
+
+        next_page_url = response.css(
+            '.house-lst-page-box a[gahref=results_next_page]::attr(href)').extract_first()
+        if next_page_url is not None:
+            # 递归下一页
+         print u'\r\n※ ※ ※ ※ ※    next page : %s    ※ ※ ※ ※ ※\r\n' % next_page_url
+         yield scrapy.Request(response.urljoin(next_page_url), callback=self.parse)
+
         item_list = response.css('#house-lst div.info-panel')
         print u'※ ※ ※ ※ ※    current total : %d    ※ ※ ※ ※ ※' % len(item_list)
         for item in item_list:
@@ -24,7 +110,16 @@ class HomeSpider(scrapy.Spider):
             xqherf = re.sub('\D','',xqherf)
             totalcount = item.css('.square .num::text').extract_first()
             url = item.css('h2 > a::attr(href)').extract_first()
-            yield scrapy.Request(self.base_url + url, meta={'property': property, 'xiaoqu': xiaoqu , 'area': area ,'xqherf':xqherf ,'totalcount':totalcount},
+
+            item_list_href = response.css('#house-lst a[name=selectDetail]::attr(href)').extract()
+            print u'※ ※ ※ ※ ※    current total : %d    ※ ※ ※ ※ ※' % len(item_list)
+            for item_href in item_list_href:
+                xqid = re.search(r'\d{1,}', item_href).group()
+                if xqid in self.xqids:
+                    # print u'※ ※ ※ ※ ※    skip : %s    ※ ※ ※ ※ ※' % cid
+                    pass
+                else:
+                    yield scrapy.Request(self.base_url + url, meta={'property': property, 'xiaoqu': xiaoqu , 'area': area ,'xqherf':xqherf ,'totalcount':totalcount},
                                  callback=self.parse_detail)
 
     def parse_detail(self, response):
