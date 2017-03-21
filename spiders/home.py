@@ -84,11 +84,13 @@ class HomeSpider(scrapy.Spider):
             use_unicode=False
         )
         cursor = self.conn.cursor()
-        cursor.execute('select distinct(xqid) from lianjia.data')
+        cursor.execute('select distinct(titileid) from lianjia.data')
         result = cursor.fetchall()
-        self.xqids = []
+
+
+        self.titileids = []
         for item in result:
-            self.xqids.append(item[0])
+            self.titileids.append(item[0])
 
     def parse(self, response):
 
@@ -107,22 +109,23 @@ class HomeSpider(scrapy.Spider):
             area = item.css('div.where > span:nth-child(3)::text').extract_first()
             area = re.sub('\D', '', area)
             xqherf = item.css('div.where > a::attr(href)').extract_first()
-            xqherf = re.sub('\D','',xqherf)
+            xqherf = re.sub('\D', '', xqherf)
             totalcount = item.css('.square .num::text').extract_first()
             url = item.css('h2 > a::attr(href)').extract_first()
 
             item_list_href = response.css('#house-lst a[name=selectDetail]::attr(href)').extract()
             print u'※ ※ ※ ※ ※    current total : %d    ※ ※ ※ ※ ※' % len(item_list)
             for item_href in item_list_href:
-                xqid = re.search(r'\d{1,}', item_href).group()
-                if xqid in self.xqids:
+                itid = re.search(r'\d{1,}', item_href).group()
+                if itid in self.titileids:
                     # print u'※ ※ ※ ※ ※    skip : %s    ※ ※ ※ ※ ※' % cid
                     pass
                 else:
-                    yield scrapy.Request(self.base_url + url, meta={'property': property, 'xiaoqu': xiaoqu , 'area': area ,'xqherf':xqherf ,'totalcount':totalcount},
+                    yield scrapy.Request(self.base_url + url, meta={'property': property, 'xiaoqu': xiaoqu , 'area': area ,'xqherf':xqherf ,'totalcount':totalcount ,'url' :url},
                                  callback=self.parse_detail)
 
     def parse_detail(self, response):
+        # inspect_response(response, self)
         home = HomelinkItem()
         # inspect_response(response, self)
         home['title'] = response.css('h1.main::text').extract_first()
@@ -130,6 +133,8 @@ class HomeSpider(scrapy.Spider):
         home['property'] = response.meta['property']
         home['area'] =  response.meta['area']
         home['xqid'] = response.meta['xqherf']
+        home['titileid'] = response.meta['url']
+        home['titileid'] = re.sub('\D', '', home['titileid'])
         home['totalcount'] = response.meta['totalcount']
         home['louceng'] = response.css(
             'body > div.zf-top > div.cj-cun > div.content.forRent > table > tr:nth-child(1) > td:nth-child(2)::text').extract_first()

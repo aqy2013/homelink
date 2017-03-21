@@ -21,12 +21,12 @@ class HomelinkPipeline(object):
 
     def process_item(self, item, spider):
         cursor = self.conn.cursor()
-        sql = 'insert into lianjia.data(title,address,avgPrice,property,chaoxiang,sjtime,xiaoqu,quyu,count,xqid,totalcount,area) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        sql = 'insert into lianjia.data(title,address,avgPrice,property,chaoxiang,sjtime,xiaoqu,quyu,count,xqid,totalcount,area,titileid) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
 
         try:
             cursor.execute(sql, (
             item['title'], item['address'], item['avgPrice'], item['property'], item['chaoxiang'], item['sjtime'],
-            item['xiaoqu'], item['quyu'], item['count'], item['xqid'], item['totalcount'], item['area']))
+            item['xiaoqu'], item['quyu'], item['count'], item['xqid'], item['totalcount'], item['area'],item['titileid']))
             self.conn.commit()
         except Exception, e:
             print e

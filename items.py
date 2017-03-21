@@ -41,4 +41,5 @@ class HomelinkItem(scrapy.Item):
     quyu = scrapy.Field(output_processor=remove_useless_tag)
     count = scrapy.Field(output_processor=remove_useless_tag)
     xqid = scrapy.Field()
+    titileid = scrapy.Field()
     totalcount = scrapy.Field()
