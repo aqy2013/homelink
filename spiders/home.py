@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
 import re
-import string
 from itertools import product
 from ..items import HomelinkItem
 from scrapy.shell import inspect_response
@@ -14,12 +13,12 @@ class HomeSpider(scrapy.Spider):
     name = "home"
     base_url = 'http://sh.lianjia.com'
     allowed_domains = ["sh.lianjia.com"]
-    start_urls = [base_url + '/zufang']
+    start_urls = []
 
     # 可筛选条件
     districts = {
-        'pudongxinqu': '浦东',
-        'minhang': '闵行',
+        # 'pudongxinqu': '浦东',
+         'minhang': '闵行',
         'baoshan': '宝山',
         'xuhui': '徐汇',
         'putuo': '普陀',
@@ -28,13 +27,13 @@ class HomeSpider(scrapy.Spider):
         'songjiang': '松江',
         'jiading': '嘉定',
         'huangpu': '黄浦',
-        'jingan': '静安',
-        'zhabei': '闸北',
-        'hongkou': '虹口',
-        'qingpu': '青浦',
-        'fengxian': '奉贤',
-        'jinshan': '金山',
-        'chongming': '崇明'
+        # 'jingan': '静安',
+        # 'zhabei': '闸北',
+        # 'hongkou': '虹口',
+        # 'qingpu': '青浦',
+        # 'fengxian': '奉贤',
+        # 'jinshan': '金山',
+        # 'chongming': '崇明'
     }
     prices = {
         'z1': '1000-2000元',
@@ -68,11 +67,10 @@ class HomeSpider(scrapy.Spider):
     #                     floors.keys(), decorations.keys(), brand.keys(), kind.keys() ,lable.keys())
     type_keys = product(prices.keys(), areas.keys())
      # 排列组合所有条件
-    list_urls = {}
+    # list_urls = {}
     for district in districts:
         for type_key in type_keys:
             url = base_url + '/zufang/' + district + '/' + ''.join(type_key)
-            list_urls[url] = 0
             start_urls.append(url)
 
     def __init__(self):
@@ -92,6 +90,8 @@ class HomeSpider(scrapy.Spider):
         for item in result:
             self.titileids.append(item[0])
 
+        print self.titileids
+
     def parse(self, response):
 
         next_page_url = response.css(
@@ -102,7 +102,7 @@ class HomeSpider(scrapy.Spider):
          yield scrapy.Request(response.urljoin(next_page_url), callback=self.parse)
 
         item_list = response.css('#house-lst div.info-panel')
-        print u'※ ※ ※ ※ ※    current total : %d    ※ ※ ※ ※ ※' % len(item_list)
+        print u'※ ※   current total : %d    ※ ※ ※ ※ ※' % len(item_list)
         for item in item_list:
             xiaoqu = item.css('span.nameEllipsis::text').extract_first()
             property = item.css('div.where > span:nth-child(2)::text').extract_first()
@@ -113,21 +113,21 @@ class HomeSpider(scrapy.Spider):
             totalcount = item.css('.square .num::text').extract_first()
             url = item.css('h2 > a::attr(href)').extract_first()
 
-            item_list_href = response.css('#house-lst a[name=selectDetail]::attr(href)').extract()
-            print u'※ ※ ※ ※ ※    current total : %d    ※ ※ ※ ※ ※' % len(item_list)
-            for item_href in item_list_href:
-                itid = re.search(r'\d{1,}', item_href).group()
-                if itid in self.titileids:
-                    # print u'※ ※ ※ ※ ※    skip : %s    ※ ※ ※ ※ ※' % cid
-                    pass
-                else:
-                    yield scrapy.Request(self.base_url + url, meta={'property': property, 'xiaoqu': xiaoqu , 'area': area ,'xqherf':xqherf ,'totalcount':totalcount ,'url' :url},
-                                 callback=self.parse_detail)
+            item_href = response.css('#house-lst a[name=selectDetail]::attr(href)').extract_first()
+            itid = re.search(r'\d{1,}', item_href).group()
+
+            if itid in self.titileids:
+                print u'※ skip : %s    ※ ※ ※ ※ ※' % itid
+                pass
+            else:
+                yield scrapy.Request(self.base_url + url,
+                                     meta={'property': property, 'xiaoqu': xiaoqu, 'area': area, 'xqherf': xqherf,
+                                           'totalcount': totalcount, 'url': url},
+                                     callback=self.parse_detail)
 
     def parse_detail(self, response):
         # inspect_response(response, self)
         home = HomelinkItem()
-        # inspect_response(response, self)
         home['title'] = response.css('h1.main::text').extract_first()
         home['avgPrice'] = response.css('div.houseInfo div.price div.mainInfo.bold::text').extract_first()
         home['property'] = response.meta['property']
